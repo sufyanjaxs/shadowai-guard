@@ -4,7 +4,55 @@ Everything in this document is account work that only you can do (identity, paym
 provider, app stores). The code is finished and verified — see the "Verified status"
 table in `README.md`.
 
-Estimated time: ~45 minutes plus waiting for review queues.
+> **No budget?** Read §0 first. You can launch and take your first customer with
+> $0 — the Stripe and Chrome Web Store steps are both optional.
+
+---
+
+## 0. The zero-cost path (start here)
+
+| Piece | Cost | Required? |
+|---|---|---|
+| Supabase free tier (2 projects, 500 MB, plenty for dozens of companies) | $0 | yes |
+| Vercel hobby tier (import the private GitHub repo, zero config) | $0 | yes |
+| Resend free tier (3,000 emails/month) — optional, invites fall back to a copyable link | $0 | no |
+| **Microsoft Edge Add-ons** — free to register and submit, same Chromium extension | $0 | recommended |
+| Unpacked install for Chrome (customer loads the folder once, no store) | $0 | works now |
+| Stripe | no monthly fee, **but Stripe does not operate in Pakistan** | skip |
+| Chrome Web Store | $5 one-time developer registration fee | when revenue exists |
+
+**Selling without Stripe.** `BILLING_PROVIDER=manual` (the default when Stripe is not
+configured) shows "Activate by invoice" instead of a card button. When the customer's
+bank transfer lands:
+
+```bash
+cd web
+node scripts/set-plan.mjs --list                              # see every workspace
+node scripts/set-plan.mjs admin@customer.com starter          # 25 seats
+node scripts/set-plan.mjs admin@customer.com business 150     # custom seat count
+```
+
+That writes the subscription row; the extension picks the new seat limit up on its
+next policy sync. No payment provider, no country restriction, no percentage fees.
+
+**Shipping the extension with no store at all** (fine for B2B — the customer's IT
+admin installs it once for the whole team):
+
+1. `pnpm build:ext`
+2. Zip the **contents** of `extension/dist`.
+3. Send the zip plus these instructions:
+
+```
+1. Unzip to a permanent folder (e.g. C:\ShadowAI-Guard)
+2. chrome://extensions → enable "Developer mode" (top right)
+3. "Load unpacked" → select that folder
+4. Click the extension icon → Log In with the work email the admin invited
+```
+
+**Edge Add-ons** (free, proper auto-updating install, same package): register at
+<https://partnercenter.microsoft.com> → Edge Add-ons, upload the same zip. Chromium
+extensions port over with no code changes. Many businesses run Edge, and Chrome users
+can add Edge Add-ons as a source too.
 
 ---
 
@@ -41,7 +89,11 @@ Check it worked:
 pnpm test:rls      # must print "17 checks passed"
 ```
 
-## 2. Stripe (15 min)
+## 2. Stripe (15 min) — **skip entirely unless you are in a Stripe-supported country**
+
+Stripe is not available in Pakistan (or most of South Asia). If you are in a supported
+country and want self-serve card checkout, do this; otherwise leave
+`BILLING_PROVIDER=manual` and use `scripts/set-plan.mjs`.
 
 1. Create an account at <https://dashboard.stripe.com> and activate it (needs your
    business details and bank account — this is the step that makes you money).
@@ -82,16 +134,18 @@ it is just manual.
    (Framework: Next.js, root directory: `web`).
 2. Environment variables (Production + Preview):
    `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
-   `SUPABASE_SERVICE_ROLE_KEY`, `APP_URL`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`,
-   `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`,
-   `STRIPE_PRICE_BUSINESS`, `SIGNUP_REQUIRES_EMAIL_CONFIRMATION=true`,
-   and the Resend pair if configured.
+   `SUPABASE_SERVICE_ROLE_KEY`, `APP_URL`, `BILLING_PROVIDER`,
+   `SIGNUP_REQUIRES_EMAIL_CONFIRMATION=true`, `NEXT_PUBLIC_SUPPORT_EMAIL`,
+   plus the Stripe set and the Resend pair if you are using them.
    `APP_URL` **must** equal the public origin — invitation links are built from it.
 3. Deploy, then set `APP_URL` to the real domain and redeploy.
 4. Verify: `https://<domain>/api/health` returns `{"status":"ok","database":"reachable"}`.
    Point an uptime monitor at it.
 
 ## 5. Publish the extension (10 min + review)
+
+The $5 Chrome Web Store fee is the only part of this runbook that costs money, so it
+is optional for the first customers — see §0. When you are ready to pay it:
 
 1. `pnpm build:ext`, then zip the **contents** of `extension/dist` (not the folder).
 2. Developer mode is **off** for store uploads — the zip must contain `manifest.json`
