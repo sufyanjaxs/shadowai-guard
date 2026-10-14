@@ -1,0 +1,28 @@
+# Environment variables (never commit these — they hold credentials)
+.env
+.env.*
+!.env.example
+extension/.env
+extension/.env.local
+web/.env.local
+
+# Dependencies and build output
+node_modules
+dist
+.next
+out
+*.tsbuildinfo
+
+# Supabase CLI's downloaded binaries and generated local secrets
+.tools/
+supabase/.temp/
+
+# E2E browser profile (keeps the loaded-extension state between runs)
+extension/e2e/.profile
+
+# Deployment / tooling
+.vercel
+*.log
+coverage
+.DS_Store
+Thumbs.db

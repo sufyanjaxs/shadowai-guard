@@ -1,0 +1,24 @@
+{
+  "name": "shadowai-guard",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "dev:ext": "pnpm --filter extension dev",
+    "build:web": "pnpm --filter web build",
+    "build:ext": "pnpm --filter extension build",
+    "lint": "pnpm --filter web lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @shadowai/shared test && pnpm --filter web test",
+    "test:rls": "pnpm --filter web exec node scripts/rls-check.mjs",
+    "test:e2e:web": "pnpm --filter web exec node e2e/run-web-e2e.mjs"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "core-js",
+      "unrs-resolver",
+      "@swc/core"
+    ]
+  }
+}

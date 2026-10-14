@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ShadowAI Guard E2E Harness</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 24px; background: #f7f7f8; }
+    section { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    h2 { font-size: 15px; margin: 0 0 10px; }
+    #composer { min-height: 60px; border: 1px solid #d1d5db; border-radius: 8px; padding: 10px; }
+    #log { font-family: ui-monospace, monospace; font-size: 12px; white-space: pre-wrap; background: #111827; color: #d1fae5; padding: 10px; border-radius: 8px; min-height: 40px; }
+  </style>
+</head>
+<body>
+  <!-- Mimics a ChatGPT-style rich composer: contenteditable + explicit send button.
+       id="prompt-textarea" mirrors the real ChatGPT composer id. -->
+  <section id="ai-composer">
+    <h2>AI composer (chatgpt.com path)</h2>
+    <div id="prompt-textarea" contenteditable="true" role="textbox" aria-label="Message"></div>
+    <button data-testid="send-button" id="send">Send</button>
+  </section>
+
+  <!-- A bare contenteditable composer with NO known id: catches the case where a host
+       changes its composer id and only the contenteditable fallback can still match. -->
+  <section id="ai-composer-unknown-id">
+    <h2>AI composer, unknown id (selector-drift fallback)</h2>
+    <div id="weird-composer-xyz" contenteditable="true" role="textbox" aria-label="Message 2"></div>
+    <button data-testid="send-button" id="send2">Send</button>
+  </section>
+
+  <!-- Mimics a generic web form (webmail, CRM, internal tool). -->
+  <section id="generic-form">
+    <h2>Generic form (unknown-host path)</h2>
+    <form id="promptForm">
+      <textarea name="prompt" id="prompt" rows="3" style="width:100%"></textarea>
+      <button type="submit" id="submitBtn">Post</button>
+    </form>
+  </section>
+
+  <!-- Password inputs must be ignored (login forms must keep working). -->
+  <section id="login-form">
+    <h2>Password field (must be ignored)</h2>
+    <input type="password" id="pw" placeholder="password" />
+    <input type="text" id="user" placeholder="username" />
+  </section>
+
+  <h2>Sent messages</h2>
+  <div id="log"></div>
+
+  <script>
+    window.__sent = [];
+    function log(line) {
+      window.__sent.push(line);
+      document.getElementById('log').textContent = window.__sent.join('\n');
+    }
+
+    document.getElementById('send').addEventListener('click', () => {
+      log('ai:' + document.getElementById('prompt-textarea').innerText.trim());
+    });
+
+    document.getElementById('send2').addEventListener('click', () => {
+      log('ai2:' + document.getElementById('weird-composer-xyz').innerText.trim());
+    });
+
+    document.getElementById('promptForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      log('form:' + document.getElementById('prompt').value.trim());
+    });
+  </script>
+</body>
+</html>
