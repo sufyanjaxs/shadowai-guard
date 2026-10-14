@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe'
+import { getStripe } from '@/lib/stripe'
 import { requireAdmin } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { getAppUrl } from '@/lib/inviteToken'
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     const companyId = auth.context.profile.company_id!
     const appUrl = getAppUrl()
 
-    const checkoutSession = await stripe.checkout.sessions.create({
+    const checkoutSession = await getStripe().checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],

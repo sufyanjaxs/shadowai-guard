@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getStripe } from '@/lib/stripe'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { seatLimitForPrice, planForPrice } from '@/lib/plans'
 import Stripe from 'stripe'
 
@@ -39,7 +39,7 @@ async function findCompanyId(args: {
   if (args.explicit) return args.explicit
 
   if (args.subscriptionId) {
-    const { data } = await supabaseAdmin
+    const { data } = await getSupabaseAdmin()
       .from('subscriptions')
       .select('company_id')
       .eq('stripe_subscription_id', args.subscriptionId)
@@ -48,7 +48,7 @@ async function findCompanyId(args: {
   }
 
   if (args.customerId) {
-    const { data } = await supabaseAdmin
+    const { data } = await getSupabaseAdmin()
       .from('subscriptions')
       .select('company_id')
       .eq('stripe_customer_id', args.customerId)
@@ -80,7 +80,7 @@ async function upsertSubscription(args: {
 
   // onConflict company_id: a company has at most one active subscription row, and
   // stripe_subscription_id is nullable (NULLs never conflict in Postgres).
-  const { error } = await supabaseAdmin
+  const { error } = await getSupabaseAdmin()
     .from('subscriptions')
     .upsert(row, { onConflict: 'company_id' })
   if (error) throw new Error(`subscriptions upsert failed: ${error.message}`)
@@ -134,7 +134,7 @@ async function setStatusByReference(args: {
   const patch: Record<string, unknown> = { status: args.status }
   if (typeof args.seatLimit === 'number') patch.seat_limit = args.seatLimit
 
-  const { error } = await supabaseAdmin
+  const { error } = await getSupabaseAdmin()
     .from('subscriptions')
     .update(patch)
     .eq('company_id', companyId)
@@ -150,11 +150,11 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     typeof session.subscription === 'string' ? session.subscription : session.subscription?.id ?? null
   const customerId = typeof session.customer === 'string' ? session.customer : null
 
-  const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 1 })
+  const lineItems = await getStripe().checkout.sessions.listLineItems(session.id, { limit: 1 })
   const priceId = lineItems.data[0]?.price?.id ?? null
 
   if (subscriptionId) {
-    const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+    const subscription = await getStripe().subscriptions.retrieve(subscriptionId)
     await syncSubscription(subscription, subscription.status === 'active' ? 'active' : subscription.status)
     return
   }
@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
   try {
     // CRITICAL: verified on every request. Nothing in this handler runs before
     // the signature checks out.
-    event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
+    event = getStripe().webhooks.constructEvent(body, sig, webhookSecret)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'invalid signature'
     console.error('Webhook signature verification failed:', message)
@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
 
   // Idempotency: Stripe retries until it sees a 2xx, so the same event id can
   // arrive repeatedly. The primary key turns every repeat into a no-op.
-  const { error: claimError } = await supabaseAdmin
+  const { error: claimError } = await getSupabaseAdmin()
     .from('stripe_events')
     .insert({ id: event.id, type: event.type, status: 'received' })
 
@@ -266,7 +266,7 @@ export async function POST(req: NextRequest) {
         outcome = 'ignored'
     }
 
-    await supabaseAdmin
+    await getSupabaseAdmin()
       .from('stripe_events')
       .update({ status: outcome })
       .eq('id', event.id)
@@ -276,7 +276,7 @@ export async function POST(req: NextRequest) {
     const message = err instanceof Error ? err.message : 'handler error'
     console.error(`Webhook handler error for ${event.type} (${event.id}):`, message)
     // Mark failed and answer 500 so Stripe retries the delivery.
-    await supabaseAdmin.from('stripe_events').update({ status: 'failed', error: message }).eq('id', event.id)
+    await getSupabaseAdmin().from('stripe_events').update({ status: 'failed', error: message }).eq('id', event.id)
     return NextResponse.json({ error: 'Handler error' }, { status: 500 })
   }
 }

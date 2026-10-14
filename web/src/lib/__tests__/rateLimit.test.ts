@@ -3,9 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // supabaseAdmin is stubbed so the limiter can be exercised without a database.
 const rpc = vi.fn()
 vi.mock('@/lib/supabase-admin', () => ({
-  supabaseAdmin: {
-    rpc: (...args: unknown[]) => rpc(...args),
-  },
+  getSupabaseAdmin: () => ({ rpc: (...args: unknown[]) => rpc(...args) }),
 }))
 
 import { checkRateLimit, hashIdentifier } from '@/lib/rateLimit'

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { requireAdmin } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 
@@ -31,7 +31,7 @@ async function guard(callerId: string, targetId: string, companyId: string): Pro
     return { failure: NextResponse.json({ error: 'You cannot change your own access.' }, { status: 400 }) }
   }
 
-  const { data: target } = await supabaseAdmin
+  const { data: target } = await getSupabaseAdmin()
     .from('profiles')
     .select('id, company_id, role')
     .eq('id', targetId)
@@ -46,7 +46,7 @@ async function guard(callerId: string, targetId: string, companyId: string): Pro
     return { failure: NextResponse.json({ error: 'That user is not in your workspace.' }, { status: 404 }) }
   }
 
-  const { count: adminCount } = await supabaseAdmin
+  const { count: adminCount } = await getSupabaseAdmin()
     .from('profiles')
     .select('id', { count: 'exact', head: true })
     .eq('company_id', companyId)
@@ -84,7 +84,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     )
   }
 
-  const { error } = await supabaseAdmin
+  const { error } = await getSupabaseAdmin()
     .from('profiles')
     .update({ role })
     .eq('id', userId)
@@ -123,7 +123,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   // Detach rather than delete the auth account: the seat is released
   // immediately, and the person can still accept an invitation elsewhere
   // instead of losing their login.
-  const { error } = await supabaseAdmin
+  const { error } = await getSupabaseAdmin()
     .from('profiles')
     .update({ company_id: null })
     .eq('id', userId)
@@ -134,7 +134,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Could not remove that member.' }, { status: 500 })
   }
 
-  const { count: remaining } = await supabaseAdmin
+  const { count: remaining } = await getSupabaseAdmin()
     .from('profiles')
     .select('id', { count: 'exact', head: true })
     .eq('company_id', companyId)

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,7 +10,7 @@ export async function GET() {
   const startedAt = Date.now()
 
   try {
-    const { error } = await supabaseAdmin.from('companies').select('id', { count: 'exact', head: true })
+    const { error } = await getSupabaseAdmin().from('companies').select('id', { count: 'exact', head: true })
     if (error) throw error
 
     return NextResponse.json(

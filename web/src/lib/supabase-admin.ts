@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 // Next persists `fetch` responses to .next/cache/fetch-cache, keyed by URL and
 // headers. Without `cache: 'no-store'` a request through supabase-js can be
@@ -8,10 +8,20 @@ import { createClient } from '@supabase/supabase-js'
 const noStoreFetch: typeof fetch = (input, init) =>
   fetch(input, { ...init, cache: 'no-store' })
 
-// This client uses the service_role key to bypass RLS.
-// ONLY use this in secure server-side API routes and webhooks.
-export const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { global: { fetch: noStoreFetch } }
-)
+let client: SupabaseClient | null = null
+
+// Lazily constructed: building the client at module scope threw
+// "supabaseKey is required" during `next build` whenever the environment
+// variables were absent, so a deploy with one missing key failed at build time
+// instead of at request time. Now the build always succeeds and only a request
+// that genuinely needs the database fails.
+export function getSupabaseAdmin(): SupabaseClient {
+  if (!client) {
+    client = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { global: { fetch: noStoreFetch } }
+    )
+  }
+  return client
+}

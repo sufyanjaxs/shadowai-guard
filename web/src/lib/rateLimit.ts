@@ -1,5 +1,5 @@
 import { createHash } from 'crypto'
-import { supabaseAdmin } from './supabase-admin'
+import { getSupabaseAdmin } from './supabase-admin'
 
 // Fixed-window rate limiter backed by Postgres (public.check_rate_limit), so the
 // limit holds across serverless instances. The previous version kept counters in
@@ -39,7 +39,7 @@ export async function checkRateLimit(
   const key = `rl_${hashIdentifier(identifier)}`
 
   try {
-    const { data, error } = await supabaseAdmin.rpc('check_rate_limit', {
+    const { data, error } = await getSupabaseAdmin().rpc('check_rate_limit', {
       p_key: key,
       p_limit: limit,
       p_window_seconds: Math.ceil(windowMs / 1000),

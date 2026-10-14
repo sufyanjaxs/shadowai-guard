@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { requireAdmin } from '@/lib/auth'
 
 // Full member list for admins. The Team page reads this instead of querying
@@ -12,12 +12,12 @@ export async function GET() {
   const companyId = auth.context.profile.company_id!
 
   const [{ data: members, error: membersError }, { data: subscription }] = await Promise.all([
-    supabaseAdmin
+    getSupabaseAdmin()
       .from('profiles')
       .select('id, role, created_at')
       .eq('company_id', companyId)
       .order('created_at', { ascending: true }),
-    supabaseAdmin
+    getSupabaseAdmin()
       .from('subscriptions')
       .select('seat_limit')
       .eq('company_id', companyId)

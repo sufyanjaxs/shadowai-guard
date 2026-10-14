@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { getClientIp, requireAdmin } from '@/lib/auth'
 import { createInviteToken, buildInviteLink, getAppUrl, inviteExpiry } from '@/lib/inviteToken'
@@ -37,8 +37,8 @@ export async function POST(req: NextRequest) {
   const role = parsed.role
 
   const [{ data: sub }, { count: usedSeats }] = await Promise.all([
-    supabaseAdmin.from('subscriptions').select('seat_limit').eq('company_id', companyId).single(),
-    supabaseAdmin.from('profiles').select('id', { count: 'exact', head: true }).eq('company_id', companyId),
+    getSupabaseAdmin().from('subscriptions').select('seat_limit').eq('company_id', companyId).single(),
+    getSupabaseAdmin().from('profiles').select('id', { count: 'exact', head: true }).eq('company_id', companyId),
   ])
 
   const seatLimit = sub?.seat_limit ?? 0
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
 
   // One live invite per address: re-sending replaces the old token rather than
   // leaving a second valid link in someone's inbox.
-  await supabaseAdmin
+  await getSupabaseAdmin()
     .from('invites')
     .update({ accepted_at: new Date().toISOString() })
     .eq('company_id', companyId)
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     .is('accepted_at', null)
 
   const token = createInviteToken()
-  const { error } = await supabaseAdmin.from('invites').insert({
+  const { error } = await getSupabaseAdmin().from('invites').insert({
     company_id: companyId,
     email,
     role,
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
   }
 
   const link = buildInviteLink(token)
-  const { data: company } = await supabaseAdmin.from('companies').select('name').eq('id', companyId).single()
+  const { data: company } = await getSupabaseAdmin().from('companies').select('name').eq('id', companyId).single()
   const emailResult = await sendInviteEmail({
     to: email,
     companyName: company?.name || 'Your company',
@@ -94,7 +94,7 @@ export async function GET() {
 
   const { company_id: companyId } = auth.context.profile
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await getSupabaseAdmin()
     .from('invites')
     .select('id, email, role, expires_at, accepted_at, created_at')
     .eq('company_id', companyId)
@@ -118,7 +118,7 @@ export async function DELETE(req: NextRequest) {
   if (!id) return NextResponse.json({ error: 'Missing invitation id.' }, { status: 400 })
 
   // Scope the delete by company_id so an id from another tenant cannot be revoked.
-  const { error } = await supabaseAdmin
+  const { error } = await getSupabaseAdmin()
     .from('invites')
     .delete()
     .eq('id', id)

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { isValidInviteToken } from '@/lib/inviteToken'
 import InviteAccept from './InviteAccept'
 
@@ -16,15 +16,15 @@ export default async function InvitePage({ params }: { params: { token: string }
 
   // The service client is used because the visitor is by definition not logged in
   // yet. Only non-secret fields are handed to the client.
-  if (isValidInviteToken(token) && supabaseAdmin) {
-    const { data: invite } = await supabaseAdmin
+  if (isValidInviteToken(token) && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const { data: invite } = await getSupabaseAdmin()
       .from('invites')
       .select('email, company_id, accepted_at, expires_at')
       .eq('token', token)
       .maybeSingle()
 
     if (invite) {
-      const { data: company } = await supabaseAdmin
+      const { data: company } = await getSupabaseAdmin()
         .from('companies')
         .select('name')
         .eq('id', invite.company_id)

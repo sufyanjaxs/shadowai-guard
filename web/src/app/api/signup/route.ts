@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { getClientIp } from '@/lib/auth'
 import { TRIAL_SEATS } from '@/lib/plans'
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
   const { email, password, companyName } = parsed
   const needsConfirmation = requiresEmailConfirmation()
 
-  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+  const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
     email,
     password,
     email_confirm: !needsConfirmation,
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
   let companyId: string | null = null
 
   try {
-    const { data: company, error: companyError } = await supabaseAdmin
+    const { data: company, error: companyError } = await getSupabaseAdmin()
       .from('companies')
       .insert({ name: companyName })
       .select('id')
@@ -77,12 +77,12 @@ export async function POST(req: NextRequest) {
 
     // The auth.users trigger already inserted a profile with role 'member' and
     // no company; this promotes the first user of a new company to its admin.
-    const { error: profileError } = await supabaseAdmin
+    const { error: profileError } = await getSupabaseAdmin()
       .from('profiles')
       .upsert({ id: userId, company_id: companyId, role: 'admin' }, { onConflict: 'id' })
     if (profileError) throw profileError
 
-    const { error: subError } = await supabaseAdmin
+    const { error: subError } = await getSupabaseAdmin()
       .from('subscriptions')
       .upsert(
         { company_id: companyId, plan: 'trial', status: 'trialing', seat_limit: TRIAL_SEATS },
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
       )
     if (subError) throw subError
 
-    const { error: policyError } = await supabaseAdmin
+    const { error: policyError } = await getSupabaseAdmin()
       .from('policies')
       .upsert(
         DEFAULT_POLICIES.map(([data_type, action]) => ({ company_id: companyId!, data_type, action })),
@@ -100,8 +100,8 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     // Roll back so we never leave a company with no admin, or a user with no company.
     console.error('Signup provisioning failed:', err)
-    if (companyId) await supabaseAdmin.from('companies').delete().eq('id', companyId)
-    await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {})
+    if (companyId) await getSupabaseAdmin().from('companies').delete().eq('id', companyId)
+    await getSupabaseAdmin().auth.admin.deleteUser(userId).catch(() => {})
     return NextResponse.json({ error: 'Could not finish setting up the workspace. Please try again.' }, { status: 500 })
   }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getStripe } from '@/lib/stripe'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { requireAdmin } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { getAppUrl } from '@/lib/inviteToken'
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   try {
     // Scoped to the caller's own company, so one company can never open the
     // billing portal of another.
-    const { data: subscription } = await supabaseAdmin
+    const { data: subscription } = await getSupabaseAdmin()
       .from('subscriptions')
       .select('stripe_customer_id')
       .eq('company_id', auth.context.profile.company_id!)
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No active subscription found.' }, { status: 400 })
     }
 
-    const portalSession = await stripe.billingPortal.sessions.create({
+    const portalSession = await getStripe().billingPortal.sessions.create({
       customer: subscription.stripe_customer_id,
       // Configured origin, not the request Origin header.
       return_url: `${getAppUrl()}/dashboard/billing`,

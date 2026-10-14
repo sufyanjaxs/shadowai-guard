@@ -14,7 +14,7 @@ const { listLineItems, retrieveSubscription } = vi.hoisted(() => ({
 vi.mock('@/lib/stripe', () => {
   const client = new Stripe('sk_test_placeholder_for_unit_tests', { typescript: true })
   return {
-    stripe: Object.assign(client, {
+    getStripe: () => Object.assign(client, {
       checkout: { sessions: { listLineItems } },
       subscriptions: { retrieve: retrieveSubscription },
     }),
@@ -56,9 +56,7 @@ function chain(table: string, filters: Record<string, unknown> = {}) {
 }
 
 vi.mock('@/lib/supabase-admin', () => ({
-  supabaseAdmin: {
-    from: (table: string) => chain(table),
-  },
+  getSupabaseAdmin: () => ({ from: (table: string) => chain(table) }),
 }))
 
 import { POST } from '@/app/api/webhooks/stripe/route'

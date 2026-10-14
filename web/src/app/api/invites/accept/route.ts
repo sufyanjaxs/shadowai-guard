@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { createServerSupabase } from '@/lib/supabase-server'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { getClientIp } from '@/lib/auth'
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: REASON_MESSAGE.invalid }, { status: 404 })
   }
 
-  const { data: invite } = await supabaseAdmin
+  const { data: invite } = await getSupabaseAdmin()
     .from('invites')
     .select('id, email, company_id, role, expires_at, accepted_at')
     .eq('token', token)
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Choose a password to finish joining.' }, { status: 400 })
     }
 
-    const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
+    const { data: created, error: createError } = await getSupabaseAdmin().auth.admin.createUser({
       email: invite.email,
       password,
       email_confirm: true,
@@ -104,13 +104,13 @@ export async function POST(req: NextRequest) {
     createdUser = true
   }
 
-  const { data: result, error: claimError } = await supabaseAdmin.rpc('claim_invite', {
+  const { data: result, error: claimError } = await getSupabaseAdmin().rpc('claim_invite', {
     p_token: token,
     p_user_id: userId,
   })
 
   if (claimError) {
-    if (createdUser && userId) await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {})
+    if (createdUser && userId) await getSupabaseAdmin().auth.admin.deleteUser(userId).catch(() => {})
     console.error('claim_invite failed:', claimError.message)
     return NextResponse.json({ error: 'Could not join the workspace. Please try again.' }, { status: 500 })
   }
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
   const outcome = result as { ok: boolean; reason?: string } | null
 
   if (!outcome?.ok) {
-    if (createdUser && userId) await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {})
+    if (createdUser && userId) await getSupabaseAdmin().auth.admin.deleteUser(userId).catch(() => {})
     const reason = outcome?.reason || 'invalid'
     return NextResponse.json(
       { error: REASON_MESSAGE[reason] || REASON_MESSAGE.invalid },
