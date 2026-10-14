@@ -28,6 +28,37 @@
     <button data-testid="send-button" id="send2">Send</button>
   </section>
 
+  <!-- Mimics chatgpt.com as it actually is TODAY (recon 2026-10-14):
+       textarea#mobile-composer-prompt + a send button with aria-label="Send message".
+       The old data-testid="send-button" no longer exists on the live site. -->
+  <section id="chatgpt-live">
+    <h2>chatgpt.com (live markup: #mobile-composer-prompt + aria "Send message")</h2>
+    <textarea id="mobile-composer-prompt" aria-label="Chat with ChatGPT" placeholder="Ask ChatGPT" rows="2" style="width:100%"></textarea>
+    <button id="chatgpt-send" aria-label="Send message">➤</button>
+  </section>
+
+  <!-- A composer whose send button has NO selector we know: only the structural
+       fallback can catch this. This is the "site redesigned overnight" case. -->
+  <section id="mystery-site">
+    <h2>Unlisted AI site, unrecognised send control (heuristic fallback)</h2>
+    <div id="mystery-composer" contenteditable="true" role="textbox" aria-label="Ask"></div>
+    <button id="mystery-send" class="round-icon-btn">➤</button>
+  </section>
+
+  <!-- Mimics gemini.google.com: contenteditable role=textbox, icon-only send. -->
+  <section id="gemini-like">
+    <h2>gemini.google.com (contenteditable + role=textbox)</h2>
+    <div contenteditable="true" role="textbox" aria-label="Enter a prompt for Gemini" id="gemini-box"></div>
+    <button aria-label="Send message" id="gemini-send">➤</button>
+  </section>
+
+  <!-- Mimics perplexity.ai: div#ask-input contenteditable. -->
+  <section id="perplexity-like">
+    <h2>perplexity.ai (#ask-input contenteditable)</h2>
+    <div id="ask-input" contenteditable="true" role="textbox"></div>
+    <button aria-label="Submit" id="perplexity-send">Ask</button>
+  </section>
+
   <!-- Mimics a generic web form (webmail, CRM, internal tool). -->
   <section id="generic-form">
     <h2>Generic form (unknown-host path)</h2>
@@ -66,6 +97,28 @@
       e.preventDefault();
       log('form:' + document.getElementById('prompt').value.trim());
     });
+
+    // Each live-markup composer records what was "sent", mirroring the real sites.
+    function wireSend(buttonId, readText, tag) {
+      document.getElementById(buttonId).addEventListener('click', () => {
+        log(tag + ':' + readText().trim());
+      });
+    }
+    wireSend('chatgpt-send', () => document.getElementById('mobile-composer-prompt').value, 'chatgpt');
+    wireSend('mystery-send', () => document.getElementById('mystery-composer').innerText, 'mystery');
+    wireSend('gemini-send', () => document.getElementById('gemini-box').innerText, 'gemini');
+    wireSend('perplexity-send', () => document.getElementById('ask-input').innerText, 'perplexity');
+
+    // Real drag-and-drop support so the e2e test can exercise the drop path the
+    // same way a user would: a real DataTransfer carrying real text.
+    const composer = document.getElementById('mystery-composer');
+    composer.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const text = e.dataTransfer.getData('text/plain');
+      document.execCommand('insertText', false, text);
+      log('dropped:' + text.trim());
+    });
+    composer.addEventListener('dragover', (e) => e.preventDefault());
   </script>
 </body>
 </html>

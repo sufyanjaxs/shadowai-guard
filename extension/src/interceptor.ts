@@ -1,14 +1,23 @@
 import { scanText, DataType } from '@shadowai/shared';
-import { DEFAULT_POLICY, Policy, PolicyAction, SiteConfig, getSiteConfig } from './config';
+import {
+  DEFAULT_POLICY,
+  Policy,
+  PolicyAction,
+  SiteConfig,
+  GENERIC_CONFIG,
+  getSiteConfig,
+  looksLikeSendButton,
+} from './config';
 import { getInputText, setInputText, isMonitoredElement } from './domUtils';
 import { showDialog } from './ui/dialog';
 
 let isBypassing = false;
 let currentPolicy: Policy = DEFAULT_POLICY;
 
-// Resolved once per page. Sites listed in SITE_CONFIGS get their precise selectors;
-// anything else falls back to the type-based check in isMonitoredElement.
-const site = getSiteConfig();
+// Resolved once per page. Listed sites get their precise selectors; every other
+// host uses GENERIC_CONFIG so that a brand new AI site is still enforced on
+// send-button clicks rather than only on Enter.
+const site: SiteConfig = getSiteConfig() ?? GENERIC_CONFIG;
 
 // Fetch policy from background script on initialization
 chrome.runtime.sendMessage({ type: 'GET_POLICY' }, (response) => {
@@ -185,6 +194,37 @@ function resolveComposerFor(target: HTMLElement, site: SiteConfig): HTMLElement 
   return document.querySelector(site.inputSelectors.join(',')) as HTMLElement | null;
 }
 
+// Did this click land on a send/submit control?
+//
+// Configured selectors are tried first. If none match, a structural fallback
+// runs: a button that carries a send-ish label, or that sits in the same
+// container as a monitored composer. Without it, a site that renames or
+// re-icons its send button loses click enforcement with no error anywhere —
+// exactly what happened on chatgpt.com, whose data-testid disappeared.
+//
+// A false positive here is harmless: handleSubmit scans the composer and does
+// nothing at all when it finds no detections.
+function isSendControl(target: HTMLElement, site: SiteConfig): boolean {
+  for (const selector of site.submitSelectors) {
+    try {
+      if (target.closest(selector)) return true;
+    } catch {
+      // An invalid selector must never break enforcement.
+    }
+  }
+
+  const button = target.closest('button, [role="button"], input[type="submit"]') as HTMLElement | null;
+  if (!button) return false;
+  if (looksLikeSendButton(button)) return true;
+
+  // Icon-only buttons ("➤", an SVG, a bare class name) share a container with
+  // the composer. That proximity is enough evidence to scan on click.
+  const container = button.closest('form, section, [class*="composer" i], [data-testid*="composer" i], [role="group"]');
+  if (container?.querySelector('textarea, [contenteditable="true"]')) return true;
+
+  return false;
+}
+
 export function initInterceptor() {
   // Re-scan + redact the focused field on demand (used by the dialog's "Redact & Send").
   window.addEventListener('shadowai-redact-now', () => {
@@ -193,6 +233,15 @@ export function initInterceptor() {
       handleRedact(activeEl, currentPolicy);
     }
   });
+
+  // Drag-and-drop inserts text without ever firing `paste`, so dropped secrets
+  // used to bypass the composer entirely. Same treatment as paste: inspect after
+  // the browser has inserted the content.
+  document.addEventListener('drop', (e) => {
+    const target = e.target as HTMLElement;
+    if (!isMonitoredElement(target, site)) return;
+    setTimeout(() => handleRedact(target, currentPolicy), 0);
+  }, true);
 
   // Paste only. A previous 'input' listener rewrote the field on every keystroke, which
   // destroyed partially-typed emails and phones (the caret/selection is lost when we
@@ -230,10 +279,8 @@ export function initInterceptor() {
   document.addEventListener('click', (e) => {
     if (isBypassing) return;
     const target = e.target as HTMLElement;
-    if (!target.closest || !site) return;
-    if (!site.submitSelectors.some((sel) => {
-      try { return !!target.closest(sel); } catch { return false; }
-    })) return;
+    if (!target.closest) return;
+    if (!isSendControl(target, site)) return;
 
     const composer = resolveComposerFor(target, site);
     if (composer) {

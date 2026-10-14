@@ -11,7 +11,9 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm --filter @shadowai/shared test && pnpm --filter web test",
     "test:rls": "pnpm --filter web exec node scripts/rls-check.mjs",
-    "test:e2e:web": "pnpm --filter web exec node e2e/run-web-e2e.mjs"
+    "test:e2e:web": "pnpm --filter web exec node e2e/run-web-e2e.mjs",
+    "preflight": "pnpm --filter web exec node scripts/preflight.mjs",
+    "recon:sites": "pnpm --filter extension exec node e2e/recon-live-sites.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

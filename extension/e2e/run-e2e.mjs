@@ -259,6 +259,161 @@ await test('password <input> is ignored so login forms keep working', async () =
   assert(!(await page.$(DIALOG)), 'password inputs must not trigger the dialog');
 });
 
+console.log('\nLIVE MARKUP (recon 2026-10-14: what the real sites serve today)');
+
+await test('chatgpt.com textarea + aria-label send button -> BLOCK', async () => {
+  await page.goto(GENERIC_URL, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(300);
+  await typeIn(page, '#mobile-composer-prompt', 'key sk-proj-abcdefghijklmnopqrstuvwxyz1234567890');
+  await page.click('#chatgpt-send');
+  await page.waitForSelector(DIALOG, { timeout: 4000 });
+  assert((await dialogTitle(page)) === 'Submission Blocked', 'expected BLOCK on the live chatgpt markup');
+  assert((await sentLines(page)).length === 0, 'message sent despite BLOCK');
+  await clickDialog(page, 'btn-cancel');
+});
+
+await test('send button with an unrecognised selector -> still enforced (heuristic)', async () => {
+  await page.goto(GENERIC_URL, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(300);
+  await typeIn(page, '#mystery-composer', 'key sk-proj-abcdefghijklmnopqrstuvwxyz1234567890');
+  await page.click('#mystery-send');
+  await page.waitForSelector(DIALOG, { timeout: 4000 });
+  assert((await dialogTitle(page)) === 'Submission Blocked',
+    'a redesigned send button must not silently disable enforcement');
+  assert((await sentLines(page)).length === 0, 'message sent despite BLOCK');
+  await clickDialog(page, 'btn-cancel');
+});
+
+await test('gemini-style contenteditable composer -> BLOCK on click and on Enter', async () => {
+  await page.goto(GENERIC_URL, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(300);
+  await typeIn(page, '#gemini-box', 'key sk-proj-abcdefghijklmnopqrstuvwxyz1234567890');
+  await page.click('#gemini-send');
+  await page.waitForSelector(DIALOG, { timeout: 4000 });
+  assert((await dialogTitle(page)) === 'Submission Blocked', 'expected BLOCK (click path)');
+  await clickDialog(page, 'btn-cancel');
+
+  await page.evaluate(() => { document.getElementById('gemini-box').innerText = ''; });
+  await typeIn(page, '#gemini-box', 'sk-proj-abcdefghijklmnopqrstuvwxyz1234567890');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector(DIALOG, { timeout: 4000 });
+  assert((await dialogTitle(page)) === 'Submission Blocked', 'expected BLOCK (Enter path)');
+  await clickDialog(page, 'btn-cancel');
+});
+
+await test('perplexity-style #ask-input composer -> BLOCK', async () => {
+  await page.goto(GENERIC_URL, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(300);
+  await typeIn(page, '#ask-input', 'key sk-proj-abcdefghijklmnopqrstuvwxyz1234567890');
+  await page.click('#perplexity-send');
+  await page.waitForSelector(DIALOG, { timeout: 4000 });
+  assert((await dialogTitle(page)) === 'Submission Blocked', 'expected BLOCK on perplexity markup');
+  assert((await sentLines(page)).length === 0, 'message sent despite BLOCK');
+  await clickDialog(page, 'btn-cancel');
+});
+
+console.log('\nINPUT METHODS (every way a secret can enter a composer)');
+
+await test('drag-and-drop of an email -> redacted in the composer', async () => {
+  await page.goto(GENERIC_URL, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(300);
+
+  // Focus first: a real drop only inserts into a focused composer.
+  await page.click('#mystery-composer');
+
+  // A real DataTransfer carrying real text. A synthetic event with no payload
+  // would prove nothing.
+  await page.evaluate(() => {
+    const dt = new DataTransfer();
+    dt.setData('text/plain', 'mail me at ops@corp-example.com today');
+    const composer = document.getElementById('mystery-composer');
+    composer.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
+    composer.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+  });
+  await page.waitForTimeout(500);
+
+  const text = await page.evaluate(() => document.getElementById('mystery-composer').innerText);
+  assert(!text.includes('ops@corp-example.com'), `dropped email survived: "${text}"`);
+  assert(text.includes('[EMAIL]'), `dropped email was not redacted (composer holds: "${text.slice(0, 120)}")`);
+});
+
+await test('drag-and-drop of an API key -> survives the composer but is BLOCKed on send', async () => {
+  // Same semantics as paste: only REDACT types are rewritten in the composer.
+  // BLOCK types are caught at send time, which is the point of this test.
+  await page.goto(GENERIC_URL, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(300);
+  await page.click('#mystery-composer');
+  await page.evaluate(() => {
+    const dt = new DataTransfer();
+    dt.setData('text/plain', 'key sk-proj-abcdefghijklmnopqrstuvwxyz1234567890');
+    document.getElementById('mystery-composer').dispatchEvent(
+      new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+  });
+  await page.waitForTimeout(400);
+  await page.click('#mystery-send');
+  await page.waitForSelector(DIALOG, { timeout: 4000 });
+  assert((await dialogTitle(page)) === 'Submission Blocked',
+    'a dropped API key must still be blocked on send');
+  await clickDialog(page, 'btn-cancel');
+});
+
+await test('drag-and-drop of a card number -> still caught on send', async () => {
+  await page.goto(GENERIC_URL, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(300);
+  await page.click('#mystery-composer');
+  await page.evaluate(() => {
+    const dt = new DataTransfer();
+    dt.setData('text/plain', 'my card is 4111111111111111');
+    document.getElementById('mystery-composer').dispatchEvent(
+      new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+  });
+  await page.waitForTimeout(400);
+  await page.click('#mystery-send');
+  await page.waitForSelector(DIALOG, { timeout: 4000 });
+  assert((await dialogTitle(page)) === 'Sensitive Data Detected',
+    'a dropped card number must still be caught on send');
+  await clickDialog(page, 'btn-cancel');
+});
+
+await test('typing then clicking send is enforced (no paste, no drop)', async () => {
+  await page.goto(GENERIC_URL, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(300);
+  await typeIn(page, '#mobile-composer-prompt', 'sk-proj-abcdefghijklmnopqrstuvwxyz1234567890');
+  await page.click('#chatgpt-send');
+  await page.waitForSelector(DIALOG, { timeout: 4000 });
+  assert((await dialogTitle(page)) === 'Submission Blocked', 'typed-then-sent must be blocked');
+  assert((await sentLines(page)).length === 0, 'message sent despite BLOCK');
+  await clickDialog(page, 'btn-cancel');
+});
+
+await test('a 50,000-character paste is scanned and the tab stays responsive', async () => {
+  await page.goto(GENERIC_URL, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(300);
+
+  // An EMAIL (a REDACT type) is the measurable outcome here: BLOCK types are
+  // caught at send time instead, so a card number would legitimately survive
+  // the paste itself.
+  const bigText = `${'lorem ipsum dolor sit amet '.repeat(2000)} ping ops@corp-example.com now`;
+  await page.click('#prompt');
+  await page.evaluate(async (text) => { await navigator.clipboard.writeText(text); }, bigText);
+  await page.keyboard.press('Control+V');
+  await page.waitForTimeout(800);
+
+  const val = await page.inputValue('#prompt');
+  assert(
+    val.includes('[EMAIL]'),
+    `the email inside a huge paste was not redacted (length ${val.length}, tail: "${val.slice(-80)}")`
+  );
+  assert(val.length > 40000, `paste looks truncated: ${val.length} chars`);
+
+  const elapsed = await page.evaluate(() => {
+    const started = performance.now();
+    document.getElementById('prompt').focus();
+    return performance.now() - started;
+  });
+  assert(elapsed < 250, `tab became unresponsive after a large paste (${elapsed.toFixed(0)}ms)`);
+});
+
 console.log('\nPRIVACY (source-level invariants)');
 const bgSrc = readFileSync(resolve(HERE, '..', 'src', 'background.ts'), 'utf8');
 await test('REPORT_EVENT never forwards raw text', () => {
