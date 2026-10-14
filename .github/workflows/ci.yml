@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Unit tests (detection + server)
+        run: pnpm test
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build extension
+        run: pnpm build:ext
+
+      - name: Build dashboard
+        run: pnpm build:web
+        env:
+          # Build-time only placeholders: the dashboard reads real values at
+          # runtime from the hosting platform's environment variables.
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          STRIPE_PRICE_STARTER: price_placeholder
+          STRIPE_PRICE_BUSINESS: price_placeholder
