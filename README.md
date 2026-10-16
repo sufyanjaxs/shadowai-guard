@@ -165,6 +165,6 @@ still a placeholder. See [DEPLOY.md](DEPLOY.md) for the exact sequence.
 - Build the extension with `pnpm build:ext`, zip the **contents** of `extension/dist`, and upload to the Chrome Web Store. `<all_urls>` requires a privacy policy URL — publish `/privacy` and point the listing at it.
 - Set `APP_URL` so invitation links point at the real domain.
 - For real invitation email, set `RESEND_API_KEY` and `INVITE_EMAIL_FROM`.
-- Leave `SIGNUP_REQUIRES_EMAIL_CONFIRMATION` unset (on) in production. Setting it to `false` means anyone who knows an address can create an account with it — only ever do that locally.
+- Leave `EMAIL_VERIFICATION` unset. Accounts are then created already-confirmed, which is the correct default while no SMTP provider is configured — Supabase's built-in mailer only delivers to project team members, so requiring confirmation strands every signup behind an email that never arrives. Set it to `required` only after real SMTP is live (DEPLOY.md §3).
 - Monitor `https://<domain>/api/health`; it returns 503 when the database is unreachable.
-- Housekeeping: companies whose only admin never confirmed their email still occupy a row. `DEPLOY.md` §7 has the cleanup query.
+- Housekeeping: if you later enable `EMAIL_VERIFICATION`, companies whose only admin never confirmed their email still occupy a row. `DEPLOY.md` §7 has the cleanup query.

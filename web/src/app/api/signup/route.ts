@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { getClientIp } from '@/lib/auth'
 import { TRIAL_SEATS } from '@/lib/plans'
+import { requiresEmailConfirmation } from '@/lib/emailVerification'
 
 const bodySchema = z.object({
   email: z.string().email().max(320),
@@ -24,13 +25,6 @@ const DEFAULT_POLICIES: [string, 'WARN' | 'REDACT' | 'BLOCK'][] = [
   ['PASSWORD', 'BLOCK'],
   ['CUSTOM_KEYWORD', 'WARN'],
 ]
-
-// With email confirmation ON (the production default), the account is created
-// unconfirmed and the UI tells the user to check their inbox. OFF is only for
-// local development, where there is no SMTP provider to send the mail.
-function requiresEmailConfirmation(): boolean {
-  return process.env.SIGNUP_REQUIRES_EMAIL_CONFIRMATION !== 'false'
-}
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req)

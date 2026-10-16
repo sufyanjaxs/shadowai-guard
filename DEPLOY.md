@@ -71,10 +71,9 @@ can add Edge Add-ons as a source too.
      - `https://<your-vercel-domain>/reset-password`
      - `https://<your-vercel-domain>/dashboard/**`
      - `http://localhost:3000/**` (keep during development)
-4. **Settings → Auth → Email**: keep "Confirm email" ON (the app reads
-   `SIGNUP_REQUIRES_EMAIL_CONFIRMATION`, which defaults to on).
-   Configure SMTP (Supabase's built-in SMTP is rate-limited and only for team use —
-   use Resend or another provider).
+4. **Settings → Auth → Email**: leave "Confirm email" **OFF** until you have read §3
+   and configured real SMTP. The app creates accounts already-confirmed
+   (`EMAIL_VERIFICATION` is unset), so signup works for anyone immediately.
 5. **SQL Editor** → run, in order:
    - `supabase/migrations/001_init.sql`
    - `supabase/migrations/002_seat_limit.sql`
@@ -119,14 +118,60 @@ country and want self-serve card checkout, do this; otherwise leave
    a row appears in `subscriptions` with the right `seat_limit`, and that
    `stripe_events` recorded the event id exactly once.
 
-## 3. Resend (5 min, optional but recommended)
+## 3. Email — read this before you promise anyone an invite
 
-1. Account at <https://resend.com>, verify your domain.
-2. API key → `RESEND_API_KEY`.
-3. Sender address → `INVITE_EMAIL_FROM` (e.g. `ShadowAI Guard <noreply@yourdomain.com>`).
+**Out of the box, the app sends no email at all, and this is correct.** Accounts are
+created already-confirmed and `EMAIL_VERIFICATION` is off, so signup works for any
+customer the moment you deploy. Invite links are shown in the dashboard for you to
+send however you like.
 
-Without it, invite links are shown in the dashboard instead of emailed — that works,
-it is just manual.
+You only need this section once you want **real verification email**.
+
+### Why the default is off
+
+Supabase's built-in mailer — what a project gets with no SMTP provider configured —
+**only ever delivers to the project's own team members**, and on the free tier it is
+heavily rate limited. Turning on "Confirm email" without a real provider does not
+verify anyone. It creates the account, tells the user to check their inbox, and no
+mail is ever sent. Every signup is stranded behind a message that does not exist.
+This is not theoretical; it is exactly what happened on the first live deployment.
+
+`EMAIL_VERIFICATION` is read as an exact match on `required`, so unset, empty or stale
+values fail safe to **off**. An unverified account is recoverable. An unreachable one
+is not.
+
+### Turning on real email
+
+1. **You need a sending domain you control.** Resend, Postmark, Brevo and every other
+   provider authenticate mail with DKIM/SPF/DMARC records in your DNS. With no domain
+   there is no free workaround — Resend's unverified `onboarding@resend.dev` sender
+   only delivers to your own Resend account address, which is useless to a customer.
+   A domain is roughly $10/year.
+2. **Resend** → account at <https://resend.com> (free, 3,000 emails/month) → add the
+   domain → paste the DKIM CNAME, the SPF MX record and the DMARC TXT record into your
+   DNS provider → wait for "Verified".
+3. Create an API key → **Supabase → Authentication → SMTP → Custom SMTP**:
+
+   | Field | Value |
+   |---|---|
+   | Host | `smtp.resend.com` |
+   | Port | `465` (or `587` with TLS on) |
+   | Username | `resend` |
+   | Password | your `re_…` API key |
+   | Sender address | `ShadowAI Guard <noreply@yourdomain.com>` — must be on the verified domain |
+
+4. Supabase → **Authentication → Email → Confirm email: ON**.
+5. Set `EMAIL_VERIFICATION=required` in the deployment's environment variables and
+   redeploy. Now, and only now, the "check your inbox" screen is truthful.
+6. Prove it before you sell anything: sign up with an address that is **not** on the
+   project team list and confirm the mail arrives.
+
+### Optional: invitation email from the app
+
+`RESEND_API_KEY` + `INVITE_EMAIL_FROM` in the deployment send invitations
+automatically instead of showing a copyable link. This is separate from step 3 — the
+app talks to Resend over HTTPS for invitations, while Supabase talks over SMTP for
+confirmations. You can set one without the other.
 
 ## 4. Deploy the dashboard to Vercel (10 min)
 
@@ -135,8 +180,8 @@ it is just manual.
 2. Environment variables (Production + Preview):
    `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
    `SUPABASE_SERVICE_ROLE_KEY`, `APP_URL`, `BILLING_PROVIDER`,
-   `SIGNUP_REQUIRES_EMAIL_CONFIRMATION=true`, `NEXT_PUBLIC_SUPPORT_EMAIL`,
-   plus the Stripe set and the Resend pair if you are using them.
+   `NEXT_PUBLIC_SUPPORT_EMAIL`, plus the Stripe set and the Resend pair if you are
+   using them. Leave `EMAIL_VERIFICATION` unset unless you have read §3.
    `APP_URL` **must** equal the public origin — invitation links are built from it.
 3. Deploy, then set `APP_URL` to the real domain and redeploy.
 4. Verify: `https://<domain>/api/health` returns `{"status":"ok","database":"reachable"}`.

@@ -5,6 +5,7 @@ import { createServerSupabase } from '@/lib/supabase-server'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { getClientIp } from '@/lib/auth'
 import { isValidInviteToken } from '@/lib/inviteToken'
+import { requiresEmailConfirmation } from '@/lib/emailVerification'
 
 const bodySchema = z.object({
   token: z.string().min(1).max(200),
@@ -24,13 +25,6 @@ const REASON_MESSAGE: Record<string, string> = {
   used: 'This invitation has already been used.',
   expired: 'This invitation has expired. Ask your admin to send a new one.',
   no_seats: 'Your company has no free seats left. Ask your admin to upgrade the plan.',
-}
-
-// When email confirmation is on, a brand-new invited user cannot sign in yet.
-// The invite is deliberately NOT consumed in that case: they confirm, log in,
-// and reopen this same link, where the signed-in path redeems it atomically.
-function requiresEmailConfirmation(): boolean {
-  return process.env.SIGNUP_REQUIRES_EMAIL_CONFIRMATION !== 'false'
 }
 
 export async function POST(req: NextRequest) {
