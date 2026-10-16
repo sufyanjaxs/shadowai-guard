@@ -26,6 +26,13 @@ const REASON_MESSAGE: Record<string, string> = {
   no_seats: 'Your company has no free seats left. Ask your admin to upgrade the plan.',
 }
 
+// When email confirmation is on, a brand-new invited user cannot sign in yet.
+// The invite is deliberately NOT consumed in that case: they confirm, log in,
+// and reopen this same link, where the signed-in path redeems it atomically.
+function requiresEmailConfirmation(): boolean {
+  return process.env.SIGNUP_REQUIRES_EMAIL_CONFIRMATION !== 'false'
+}
+
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req)
   if (!(await checkRateLimit(`invite_accept_${ip}`, 10, 10 * 60 * 1000))) {
@@ -80,10 +87,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Choose a password to finish joining.' }, { status: 400 })
     }
 
+    const needsConfirmation = requiresEmailConfirmation()
+
     const { data: created, error: createError } = await getSupabaseAdmin().auth.admin.createUser({
       email: invite.email,
       password,
-      email_confirm: true,
+      email_confirm: !needsConfirmation,
     })
 
     if (createError || !created?.user) {
@@ -102,6 +111,14 @@ export async function POST(req: NextRequest) {
 
     userId = created.user.id
     createdUser = true
+
+    if (needsConfirmation) {
+      // Stop here on purpose. The account exists but cannot sign in until the
+      // address is confirmed, so redeeming the invite now would attach a company
+      // to an account nobody can reach. They confirm, log in, and reopen this
+      // same link — the signed-in path above then redeems it atomically.
+      return NextResponse.json({ ok: true, needsConfirmation: true, email: invite.email })
+    }
   }
 
   const { data: result, error: claimError } = await getSupabaseAdmin().rpc('claim_invite', {

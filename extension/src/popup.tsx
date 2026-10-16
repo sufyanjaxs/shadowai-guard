@@ -3,9 +3,9 @@ import { createRoot } from 'react-dom/client';
 
 type PolicyAction = 'WARN' | 'REDACT' | 'BLOCK';
 
-// The dashboard the extension authenticates against. Kept in sync with
-// web/.env.local's APP_URL; changing it only requires a rebuild.
-const DASHBOARD_URL = 'https://app.shadowaiguard.com';
+// The dashboard the extension authenticates against. Must match APP_URL in
+// web/.env.local, otherwise "Open Dashboard" sends customers to a dead domain.
+const DASHBOARD_URL = 'https://web-nu-sage-7afd8st5y4.vercel.app';
 
 const ACTION_COLOR: Record<PolicyAction, string> = {
   WARN: 'bg-amber-100 text-amber-800',

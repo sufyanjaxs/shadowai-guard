@@ -93,6 +93,40 @@ const MEMBER = { email: `member-${stamp}@example.com`, password: 'E2e!Member123'
 
 console.log(`ShadowAI Guard web e2e against ${BASE}\n`);
 
+const adminHeaders = () => ({
+  apikey: SERVICE_KEY,
+  Authorization: `Bearer ${SERVICE_KEY}`,
+  'Content-Type': 'application/json',
+});
+
+// In production SIGNUP_REQUIRES_EMAIL_CONFIRMATION is ON, so the account exists
+// but cannot sign in until the address is confirmed. Confirm it the way an
+// administrator would, then continue through the real login page.
+async function confirmUserByEmail(email) {
+  const list = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?page=1&perPage=1000`, {
+    headers: adminHeaders(),
+  }).then((r) => r.json());
+  const user = (list?.users ?? []).find((u) => (u.email || '').toLowerCase() === email.toLowerCase());
+  if (!user) throw new Error(`no auth user found for ${email}`);
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${user.id}`, {
+    method: 'PUT',
+    headers: adminHeaders(),
+    body: JSON.stringify({ email_confirm: true }),
+  });
+  if (!res.ok) throw new Error(`could not confirm ${email}: ${res.status} ${await res.text()}`);
+  return user.id;
+}
+
+async function loginAs(page, email, password) {
+  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('input[type="email"]', { timeout: 20000 });
+  await page.fill('input[type="email"]', email);
+  await page.fill('input[type="password"]', password);
+  await page.click('button:has-text("Log In")');
+  await page.waitForURL('**/dashboard', { timeout: 25000 });
+  await page.waitForSelector('text=Security Overview', { timeout: 25000 });
+}
+
 const browser = await chromium.launch({ headless: true, channel: 'chromium' });
 await resetRateLimits();
 const adminContext = await browser.newContext();
@@ -139,6 +173,18 @@ await test('signup provisions the company, admin, trial seats and default polici
   await adminPage.fill('input[type="email"]', ADMIN.email);
   await adminPage.fill('input[type="password"]', ADMIN.password);
   await adminPage.click('button:has-text("Create workspace")');
+
+  const needsConfirmation = await adminPage
+    .waitForSelector('text=click the confirmation link', { timeout: 20000 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (needsConfirmation) {
+    assert(Boolean(SERVICE_KEY), 'production requires confirmation but no service key is available to confirm it');
+    await confirmUserByEmail(ADMIN.email);
+    await loginAs(adminPage, ADMIN.email, ADMIN.password);
+    return;
+  }
 
   try {
     await adminPage.waitForURL('**/dashboard', { timeout: 25000 });
@@ -203,8 +249,41 @@ await test('invited user accepts the invite and lands in the dashboard', async (
   await memberPage.fill('input[placeholder="Confirm password"]', MEMBER.password);
   await memberPage.click('button:has-text("Accept invitation")');
 
-  await memberPage.waitForURL('**/dashboard', { timeout: 20000 });
-  await memberPage.waitForSelector('text=Security Overview', { timeout: 20000 });
+  // Production confirms email addresses: the account is created and the invite is
+  // deliberately left unredeemed until the invitee comes back signed in.
+  const awaiting = await memberPage
+    .waitForSelector('text=One more step', { timeout: 20000 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (awaiting) {
+    assert(Boolean(SERVICE_KEY), 'production requires confirmation but no service key is available');
+    await confirmUserByEmail(MEMBER.email);
+    await loginAs(memberPage, MEMBER.email, MEMBER.password);
+    await memberPage.goto(`${BASE}/dashboard`, { waitUntil: 'domcontentloaded' });
+    return;
+  }
+
+  await memberPage.waitForURL('**/dashboard', { timeout: 25000 });
+  await memberPage.waitForSelector('text=Security Overview', { timeout: 25000 });
+});
+
+await test('a signed-in invitee redeems the link on return', async () => {
+  // Only meaningful when the previous step took the confirmation path; otherwise
+  // the link was already consumed and this asserts the single-use behaviour.
+  await memberPage.goto(`${BASE}${inviteLink}`, { waitUntil: 'domcontentloaded' });
+  await memberPage.waitForTimeout(1500);
+
+  const joinButton = await memberPage.$('button:has-text("Join workspace")');
+  if (joinButton) {
+    await joinButton.click();
+    await memberPage.waitForURL('**/dashboard', { timeout: 25000 });
+    await memberPage.waitForSelector('text=Security Overview', { timeout: 25000 });
+  } else {
+    const body = await memberPage.locator('body').innerText();
+    assert(/already been used|not valid/i.test(body),
+      `expected the link to be consumed, got: ${body.replace(/\n+/g, ' | ').slice(0, 160)}`);
+  }
 });
 
 await test('the new member joins the same company (admin team page shows 2 members)', async () => {

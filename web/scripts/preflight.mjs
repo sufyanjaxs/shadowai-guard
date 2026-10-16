@@ -40,7 +40,10 @@ function pass(msg) { ok.push(msg) }
 
 // Values that mean "this was never filled in".
 const PLACEHOLDER = /placeholder|your_project|your_anon|your_service|replace_me|xxxx/i
-const LOCAL = /127\.0\.0\.1|localhost|supabase\.co$/i
+// Local development addresses only. Note that hosted Supabase projects all end in
+// `.supabase.co`, so that must NOT be treated as local — an earlier version of
+// this script failed every real deployment because of it.
+const LOCAL = /127\.0\.0\.1|localhost|:\/\/0\.0\.0\.0/i
 
 function requireValue(label, value, { allowLocal = false, optional = false } = {}) {
   if (!value) {

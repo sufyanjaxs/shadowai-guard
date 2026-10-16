@@ -11,7 +11,7 @@
  * Exit code 0 = every case passed.
  */
 import { createServer } from 'node:http';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { createRequire } from 'node:module';
@@ -50,7 +50,16 @@ const server = createServer((req, res) => {
 await new Promise((r) => server.listen(PORT, '127.0.0.1', r));
 
 const { chromium } = loadPlaywright();
+// A stale profile makes this suite lie. Chrome keeps the previously installed
+// service worker in the profile directory, so after a rebuild the extension runs
+// OLD code — pointing at the previous Supabase project — and the logged-in tests
+// fail with a confusing "Invalid login credentials". The profile is a test
+// artifact, so it is recreated on every run.
 const userDataDir = resolve(HERE, '.profile');
+if (existsSync(userDataDir)) {
+  rmSync(userDataDir, { recursive: true, force: true });
+  console.log('recreated a clean browser profile (stale service workers are removed)');
+}
 
 const context = await chromium.launchPersistentContext(userDataDir, {
   headless: true,

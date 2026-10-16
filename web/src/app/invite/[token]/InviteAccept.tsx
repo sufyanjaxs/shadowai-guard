@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 
@@ -16,6 +17,7 @@ export default function InviteAccept({ token, email, companyName, status }: Prop
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [sessionEmail, setSessionEmail] = useState<string | null>(null)
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -54,6 +56,14 @@ export default function InviteAccept({ token, email, companyName, status }: Prop
 
       if (!res.ok) {
         setError(data.error || 'Could not complete the invitation.')
+        setBusy(false)
+        return
+      }
+
+      // Production requires email confirmation: the account was created but the
+      // invite is deliberately not consumed until they confirm and come back.
+      if (data.needsConfirmation) {
+        setAwaitingConfirmation(true)
         setBusy(false)
         return
       }
@@ -107,6 +117,25 @@ export default function InviteAccept({ token, email, companyName, status }: Prop
         </button>
       </div>
     )
+  }
+
+  if (awaitingConfirmation) {
+    return (
+      <div className="text-center">
+        <h2 className="text-xl font-bold mb-2">One more step</h2>
+        <p className="text-gray-600 text-sm mb-4">
+          Your account was created. Confirm <span className="font-semibold">{email}</span> using the link we
+          just emailed you, then log in and reopen this page — it will join you to {companyName} straight
+          away.
+        </p>
+        <p className="text-xs text-gray-400 mb-6">
+          Nothing has been added to the workspace yet, so the seat is still free.
+        </p>
+        <Link href="/login" className="text-blue-600 font-semibold">
+          Go to login
+        </Link>
+      </div>
+    );
   }
 
   return (
