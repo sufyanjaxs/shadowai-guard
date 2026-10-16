@@ -1,5 +1,7 @@
 import Link from 'next/link'
 
+const contact = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || ''
+
 export const metadata = {
   title: 'Privacy Policy — ShadowAI Guard',
   description: 'How ShadowAI Guard handles data: detection is local, only metadata is transmitted.',
@@ -98,9 +100,14 @@ export default function PrivacyPage() {
           </section>
         ))}
 
-        <p className="text-gray-700 leading-relaxed mb-10">
-          Questions or requests: <span className="font-semibold">privacy@shadowaiguard.com</span>
-        </p>
+        {/* Both web stores require a working privacy contact, so this is driven by
+            the same env var as billing rather than hardcoded - a hardcoded address
+            on a domain nobody controls silently fails review. */}
+        {contact && (
+          <p className="text-gray-700 leading-relaxed mb-10">
+            Questions or requests: <span className="font-semibold">{contact}</span>
+          </p>
+        )}
 
         <Link href="/" className="text-blue-600 font-semibold">← Back to ShadowAI Guard</Link>
       </div>

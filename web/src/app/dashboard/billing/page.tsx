@@ -50,8 +50,14 @@ export default function BillingPage() {
     if (mode === 'manual') {
       // No payment provider configured: the plan is activated by invoice, and the
       // workspace keeps working on its trial seats in the meantime.
+      // Never render an empty "email " — if no support address is configured the
+      // deployment owner has to fix NEXT_PUBLIC_SUPPORT_EMAIL, and saying so is
+      // more useful than printing a broken mailto.
+      const contact = supportEmail
+        ? `email ${supportEmail} and we will send an invoice`
+        : 'contact us and we will send an invoice'
       setNotice(
-        `To activate ${plan.name} (${plan.price}/month, ${plan.seats} seats), email ${supportEmail} and we will send an invoice. ` +
+        `To activate ${plan.name} (${plan.price}/month, ${plan.seats} seats), ${contact}. ` +
           `Your ${subscription?.seat_limit ?? 25} trial seats stay active until it is paid.`
       )
       setBusyPlan(null)

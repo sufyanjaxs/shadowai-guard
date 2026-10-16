@@ -25,5 +25,7 @@ export function isBillingConfigured(mode: BillingMode = getBillingMode()): boole
 }
 
 export function supportEmail(): string {
-  return process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'sales@yourdomain.com'
+  // No placeholder default on purpose: a workspace with no configured address must
+  // not render a dead "sales@yourdomain.com" link that a customer will actually try.
+  return process.env.NEXT_PUBLIC_SUPPORT_EMAIL || ''
 }
