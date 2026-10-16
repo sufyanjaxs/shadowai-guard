@@ -26,3 +26,8 @@ extension/e2e/.profile
 coverage
 .DS_Store
 Thumbs.db
+
+# Store submission artefacts. Rebuild with `node extension/scripts/package-store.mjs`.
+# The listing copy is tracked; the zip and the screenshots are generated binaries.
+extension/release/*.zip
+extension/release/screenshots/
