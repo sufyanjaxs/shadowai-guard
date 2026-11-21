@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShadowAI Guard - Keep sensitive data out of AI tools</title>
+<meta name="description" content="Local-first data leak protection for AI tools. Detect credit cards, IBANs, API keys and passwords in the browser before they are pasted or sent.">
+<style>
+:root{--bg:#080d18;--panel:#111a2c;--panel2:#162139;--line:#263550;--text:#e8eef9;--muted:#93a4bf;--accent:#4d9dff;--accent2:#22d3a5;--danger:#ff5d6c;--warn:#ffc857}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+header{position:sticky;top:0;z-index:5;background:rgba(8,13,24,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+nav{display:flex;align-items:center;gap:22px;height:64px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px;color:var(--text)}
+.brand svg{width:26px;height:26px}
+nav .links{margin-left:auto;display:flex;gap:20px;flex-wrap:wrap;font-size:14px}
+.hero{padding:80px 0 60px;text-align:center;background:radial-gradient(circle at 50% 0%,#16325a 0%,transparent 60%)}
+.badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:22px}
+.badge{border:1px solid var(--line);background:var(--panel);border-radius:99px;padding:5px 12px;font-size:12px;color:var(--muted)}
+h1{font-size:clamp(34px,6vw,64px);line-height:1.08;margin:0 0 18px;letter-spacing:-2px}
+h1 span{color:var(--accent)}
+.lead{max-width:680px;margin:0 auto 28px;color:var(--muted);font-size:18px}
+.cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn{display:inline-block;padding:12px 20px;border-radius:10px;font-weight:700;font-size:15px;border:1px solid var(--line);color:var(--text);background:var(--panel2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#04122b}
+.btn:hover{text-decoration:none;transform:translateY(-1px)}
+section{padding:56px 0;border-top:1px solid var(--line)}
+h2{font-size:clamp(24px,4vw,36px);margin:0 0 10px;letter-spacing:-1px}
+.sub{color:var(--muted);max-width:720px;margin:0 0 30px}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px}
+.card h3{margin:0 0 8px;font-size:17px}
+.card p{margin:0;color:var(--muted);font-size:14px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:#132238;border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px;color:#cfe0f7}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;text-align:center}
+.stat b{display:block;font-size:28px;color:var(--accent2)}
+.stat small{color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600}
+.scanner{max-width:760px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:28px}
+.progress{height:8px;background:#22314b;border-radius:99px;overflow:hidden;margin:14px 0 26px}
+.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .25s}
+.question{font-size:22px;font-weight:700;min-height:66px}
+.answers{display:flex;gap:12px;margin-top:22px;flex-wrap:wrap}
+.answers button{flex:1;min-width:150px;padding:14px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-weight:700;cursor:pointer}
+.answers button:hover{border-color:var(--accent)}
+.result{text-align:center;padding:14px 0}
+.result .score{font-size:64px;font-weight:800;line-height:1}
+.result .level{font-size:22px;font-weight:700;margin:8px 0}
+.result p{color:var(--muted)}
+.low{color:var(--accent2)}.medium{color:var(--warn)}.high{color:#ff9f43}.critical{color:var(--danger)}
+footer{padding:36px 0;color:var(--muted);font-size:14px;border-top:1px solid var(--line)}
+footer a{margin:0 12px}
+code{background:#132238;padding:2px 6px;border-radius:5px;font-size:13px}
+</style>
+</head>
+<body>
+<header><div class="wrap"><nav>
+<div class="brand"><svg viewBox="0 0 24 24" fill="none" stroke="#4d9dff" stroke-width="2"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg>ShadowAI Guard</div>
+<div class="links"><a href="#features">Features</a><a href="#architecture">Architecture</a><a href="#verification">Verification</a><a href="#scanner">Risk Scanner</a><a href="https://github.com/sufyanjaxs/shadowai-guard">GitHub</a></div>
+</nav></div></header>
+
+<div class="hero"><div class="wrap">
+<div class="badges"><span class="badge">Chrome Manifest V3</span><span class="badge">46 unit tests</span><span class="badge">17 RLS checks</span><span class="badge">Local-first detection</span></div>
+<h1>Stop sensitive data before it reaches <span>AI tools</span></h1>
+<p class="lead">A browser extension detects cards, Emirates ID, IBANs, emails, phones, API keys and passwords locally, then blocks or redacts them before they are pasted into ChatGPT, webmail or any web form. Only metadata leaves the browser.</p>
+<div class="cta"><a class="btn primary" href="#scanner">Run the Risk Scanner</a><a class="btn" href="https://web-nu-sage-7afd8st5y4.vercel.app">Live web demo</a><a class="btn" href="https://github.com/sufyanjaxs/shadowai-guard">View source</a></div>
+</div></div>
+
+<section id="features"><div class="wrap">
+<h2>What it catches</h2>
+<p class="sub">Detection runs inside the page. The matched value never crosses the extension boundary, so the raw text cannot be logged or leaked by the backend.</p>
+<div class="chips"><span class="chip">Credit cards</span><span class="chip">Emirates ID</span><span class="chip">IBAN</span><span class="chip">Emails</span><span class="chip">Phone numbers</span><span class="chip">API keys</span><span class="chip">Passwords</span><span class="chip">Custom keywords</span></div>
+<div class="grid" style="margin-top:22px">
+<div class="card"><h3>Block, warn or redact</h3><p>Policy-driven actions per data type: hard BLOCK on send, WARN with Send anyway or Redact and send, and silent REDACT on paste.</p></div>
+<div class="card"><h3>Metadata-only reporting</h3><p>REPORT_EVENT carries type, action, hostname and count. There is no text or content field in the event schema.</p></div>
+<div class="card"><h3>Team controls</h3><p>Invites with 256-bit single-use tokens, seat limits, per-company policies, hashed-IP rate limits and Stripe billing.</p></div>
+</div>
+</div></section>
+
+<section id="architecture"><div class="wrap">
+<h2>How it is built</h2>
+<p class="sub">Four packages in one pnpm workspace. The web app is a Next.js dashboard, so the full product runs on a server; this page is the static project showcase.</p>
+<div class="grid">
+<div class="card"><h3>shared/</h3><p>Pure TypeScript detection library with unit tests. No browser or server dependency.</p></div>
+<div class="card"><h3>extension/</h3><p>Manifest V3 Chrome extension built with Vite and React. Local detection, no raw text sent out.</p></div>
+<div class="card"><h3>web/</h3><p>Next.js admin dashboard: auth, teams, invites, Stripe billing, PDF reports and the public Risk Scanner.</p></div>
+<div class="card"><h3>supabase/</h3><p>PostgreSQL schema with row-level security on every table and service-role-only rate limit and Stripe ledgers.</p></div>
+</div>
+</div></section>
+
+<section id="verification"><div class="wrap">
+<h2>Verified, not claimed</h2>
+<p class="sub">Executed against a local Supabase stack and a production Next build on 2026-10-14.</p>
+<div class="stats">
+<div class="stat"><b>46/46</b><small>unit tests</small></div>
+<div class="stat"><b>16/16</b><small>extension e2e</small></div>
+<div class="stat"><b>20/20</b><small>web e2e</small></div>
+<div class="stat"><b>17/17</b><small>RLS isolation</small></div>
+<div class="stat"><b>21</b><small>production routes</small></div>
+<div class="stat"><b>Clean</b><small>typecheck, lint, builds</small></div>
+</div>
+</div></section>
+
+<section id="scanner"><div class="wrap">
+<h2 style="text-align:center">AI data-leak Risk Scanner</h2>
+<p class="sub" style="text-align:center;margin-left:auto;margin-right:auto">Ten quick questions. Nothing is uploaded or stored; the score is calculated in your browser.</p>
+<div class="scanner" id="quiz">
+<div id="qhead">Question 1 of 10</div>
+<div class="progress"><i id="bar"></i></div>
+<div class="question" id="qtext"></div>
+<div class="answers"><button type="button" data-a="1">Yes, we do</button><button type="button" data-a="0">No, not yet</button></div>
+</div>
+<div class="scanner" id="result" hidden>
+<div class="result"><div class="score" id="rscore"></div><div class="level" id="rlevel"></div><p id="rtext"></p>
+<div class="answers"><button type="button" id="again">Scan again</button><button type="button" id="save">Download result card</button></div></div>
+</div>
+</div></section>
+
+<footer><div class="wrap">
+<a href="https://github.com/sufyanjaxs/shadowai-guard">Source</a><a href="https://web-nu-sage-7afd8st5y4.vercel.app">Web demo</a><a href="https://github.com/sufyanjaxs">Profile</a><br>
+ShadowAI Guard - local-first DLP for AI tools. Built by Sufyan Khan.
+</div></footer>
+
+<script>
+const questions=["Do you have a clear, written policy on AI usage?","Do you technically restrict what data can be pasted into AI tools?","Are employees trained on AI data leakage risks?","Do you know which AI tools your team uses?","Do you have visibility into what data is sent to AI?","Can you automatically redact PII (emails, phones) before it reaches AI?","Can you block secrets (API keys, passwords) from being sent to AI?","Is your DLP solution running locally (privacy-first) rather than sending data to a cloud scanner?","Do you receive alerts/reports when employees attempt to leak data?","Is your AI security setup compliant with UAE PDPL / GDPR data minimization principles?"];
+let current=0,answers=[];
+const quiz=document.getElementById('quiz'),result=document.getElementById('result');
+function render(){document.getElementById('qhead').textContent='Question '+(current+1)+' of '+questions.length;document.getElementById('bar').style.width=(current/questions.length*100)+'%';document.getElementById('qtext').textContent=questions[current];}
+function finish(){const score=answers.filter(Boolean).length*10;const level=score>=80?'Low':score>=50?'Medium':score>=20?'High':'Critical';const cls=score>=80?'low':score>=50?'medium':score>=20?'high':'critical';quiz.hidden=true;result.hidden=false;document.getElementById('rscore').className='score '+cls;document.getElementById('rscore').textContent=score+'/100';document.getElementById('rlevel').className='level '+cls;document.getElementById('rlevel').textContent=level+' risk';document.getElementById('rtext').textContent=score>=80?'Strong controls in place. Keep policies and technical checks under review.':score>=50?'Reasonable foundation, with clear gaps worth closing.':score>=20?'Significant exposure. Prioritize technical blocks on secrets and personal data.':'Critical exposure. Assume sensitive data is reaching AI tools today.';result.dataset.level=level;}
+quiz.addEventListener('click',e=>{const b=e.target.closest('button[data-a]');if(!b)return;answers.push(b.dataset.a==='1');if(current<questions.length-1){current++;render();}else{finish();}});
+document.getElementById('again').addEventListener('click',()=>{current=0;answers=[];result.hidden=true;quiz.hidden=false;render();});
+document.getElementById('save').addEventListener('click',()=>{const c=document.createElement('canvas');c.width=1000;c.height=560;const x=c.getContext('2d');x.fillStyle='#080d18';x.fillRect(0,0,c.width,c.height);x.fillStyle='#111a2c';x.fillRect(40,40,920,480);x.strokeStyle='#263550';x.strokeRect(40,40,920,480);x.fillStyle='#93a4bf';x.font='26px system-ui';x.fillText('ShadowAI Guard - AI Data-Leak Risk Score',90,120);x.fillStyle=document.getElementById('rlevel').className.includes('low')?'#22d3a5':'#4d9dff';x.font='bold 150px system-ui';x.fillText(document.getElementById('rscore').textContent,90,300);x.fillStyle='#e8eef9';x.font='bold 44px system-ui';x.fillText(document.getElementById('rlevel').textContent,90,370);x.fillStyle='#93a4bf';x.font='24px system-ui';x.fillText('Local-only assessment - no data uploaded',90,440);const a=document.createElement('a');a.download='ShadowAI_Risk_Score_'+answers.filter(Boolean).length*10+'.png';a.href=c.toDataURL();a.click();});
+render();
+</script>
+</body>
+</html>
